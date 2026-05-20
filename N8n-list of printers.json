@@ -1,0 +1,1095 @@
+{
+  "name": "N8n-list of printers",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://api.siigo.com/v1/invoices",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "document_type",
+              "value": "FV"
+            },
+            {
+              "name": "created_start",
+              "value": "={{ $now.minus({days: 4}).toISO() }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Partner-Id",
+              "value": "impresion"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $node[\"Login\"].json.access_token }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "cffa1602-6bcd-401b-bfba-35e813049c4e",
+      "name": "Obtener Ventas Siigo POS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -3936,
+        512
+      ],
+      "retryOnFail": true,
+      "waitBetweenTries": 500,
+      "maxTries": 2
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "description",
+              "value": "={{ $json.items.description }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "code",
+              "value": "={{ $json.items.code }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "quantity",
+              "value": "=  {{$json.items.quantity}}",
+              "type": "number"
+            },
+            {
+              "id": "01cc63a4-2eb7-49d5-a40d-9ae17aa90718",
+              "name": "id_facturas",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "c204ea6f-7c45-4f70-a343-da465a82ff06",
+              "name": "caja",
+              "value": "={{ $json.seller }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "dae82d1c-f08b-4653-b5e2-7c832d3110f0",
+      "name": "Preparar Búsqueda Drive",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2848,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.printnode.com/printjobs",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"printerId\": {{ $json.printerId }},\n  \"title\": \"Vale Estadio\",\n  \"contentType\": \"{{$json.contentType}}\",\n  \"content\": \"{{ $json.content }}\",\n  \"source\": \"n8n-estadio\"\n}",
+        "options": {}
+      },
+      "id": "e7f13086-b139-4484-a32c-411c1979707c",
+      "name": "Enviar a PrintNote",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        816,
+        144
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "UDfQzHPSxCf5k5pv",
+          "name": "PrintNode"
+        },
+        "httpBasicAuth": {
+          "id": "8S8Q74U3fg6IaMPm",
+          "name": "PrintNode"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Rescatamos el array original con los datos intactos desde el nodo HTML\nconst datosOriginales = $('HTML').all(); \n\n// 2. Tomamos el array actual (los PDFs que acabamos de descargar)\nconst pdfsDescargados = $input.all(); \n\nlet resultado = [];\n\n// 3. Unimos manualmente el Índice 0 con el Índice 0, el 1 con el 1, etc.\nfor (let i = 0; i < pdfsDescargados.length; i++) {\n    \n    // Extraemos el PDF binario del ítem actual\n    const buffer = await this.helpers.getBinaryDataBuffer(i, 'data');\n    \n    // Construimos un JSON completamente nuevo y limpio\n    resultado.push({\n        json: {\n            // Datos para PrintNode\n            printerId: datosOriginales[i].json.printerId, \n            title: datosOriginales[i].json.description, \n            contentType: \"pdf_base64\",\n            content: buffer.toString('base64'),\n            \n            // Datos para la Base de Datos (Postgres)\n            id_factura: datosOriginales[i].json.id_facturas,\n            producto_codigo: datosOriginales[i].json.code\n        }\n    });\n}\n\nreturn resultado;"
+      },
+      "id": "f71e619a-45ef-4f4d-8b5c-279d5c834325",
+      "name": "Convertir a Base64",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        352,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.caja }}",
+                    "rightValue": "POS1",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "971d983e-d615-4855-a4cc-d5e46a04f2a3"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Caja 1"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.caja }}",
+                    "rightValue": "POS2",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "e08416a3-23b6-4369-bdf7-1f1b842292d7"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Caja 2"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.caja }}",
+                    "rightValue": "POS3",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "de129191-258b-4963-866d-579bcae16fd7"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Caja 3"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9a35aa93-1eca-4175-bfd3-e875585d2c74",
+      "name": "Identificar Impresora por Caja",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -2368,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "printerId",
+              "value": 75325627,
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "e101c28d-a821-48e1-86b2-d1e50918f094",
+      "name": "Configurar Impresora Caja 1",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2112,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "printerId",
+              "value": "12346",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "71d2440b-b65f-435a-9c33-b0fa22a631c3",
+      "name": "Configurar Impresora Caja 2",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2112,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "printerId",
+              "value": "12347",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "3b8d328a-d6d5-4357-9a2d-cc2e0a04a4e0",
+      "name": "Configurar Impresora Caja 3",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2112,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.siigo.com/auth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Partner-Id",
+              "value": "impresion"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "username",
+              "value": "##modificacion de datos"
+            },
+            {
+              "name": "access_key",
+              "value": "##modificacion de datos"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -4144,
+        512
+      ],
+      "id": "5db94d53-1a86-4ae9-a68f-271f743e5e06",
+      "name": "Login",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 500
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "283f3fed-1a3c-4674-8f5c-9e8d1c11e2c4",
+              "leftValue": "={{ $('Identificar factura').item.json.ya_existe }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2624,
+        528
+      ],
+      "id": "fb004354-81ad-4e33-957d-381b83bb59e6",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "results",
+        "options": {}
+      },
+      "id": "336efb4e-8a57-4ebc-99b2-73715480ce24",
+      "name": "Expandir Facturas",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -3760,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT EXISTS (\n    SELECT 1 FROM facturas_impresas \n    WHERE id_factura = '{{ $json.id }}' \n    AND producto_codigo = '{{ $json.items.code }}'\n) as ya_existe;;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -3328,
+        608
+      ],
+      "id": "1adc3874-751a-4f82-a05a-cee7f741df3e",
+      "name": "Identificar factura",
+      "alwaysOutputData": true,
+      "notesInFlow": false,
+      "retryOnFail": false,
+      "credentials": {
+        "postgres": {
+          "id": "eO4PGUH31MaWeoeV",
+          "name": "Santiago"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "310c5bdc-661e-4e5f-9d3f-81fb48cfe52a",
+      "name": "Descargar Imagen de Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -1456,
+        720
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "yE0ajPFrG9D1QMnT",
+          "name": "Santiago-Drive"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.FileUrl }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        112,
+        288
+      ],
+      "id": "27bec6de-6245-42ee-a49e-4c7d5219074c",
+      "name": "Descarga de PDF"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 10
+            }
+          ]
+        }
+      },
+      "id": "12026d7c-1f35-4878-abc4-fd7619bd97d2",
+      "name": "Consultar Siigo Cada 10 sg",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -4368,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO facturas_impresas (id_factura, producto_codigo)\nVALUES ('{{ $json.id_facturas }}', '{{ $json.code }}')\nON CONFLICT (id_factura, producto_codigo) DO NOTHING;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1312,
+        32
+      ],
+      "id": "93e1964a-2edd-48a3-bf9a-9e478d762d64",
+      "name": "Guardado de datos",
+      "credentials": {
+        "postgres": {
+          "id": "eO4PGUH31MaWeoeV",
+          "name": "Santiago"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8aa8f6ea-cdab-4171-aafe-c6341f31f1af",
+              "name": "HTML",
+              "value": "=<div style=\"width: 6cm; text-align: center; font-family: Arial, sans-serif; margin: 0 auto; padding: 0; line-height: 1.1;\">\n  \n  <img src=\"data:image/png;base64,{{ $json.base64_final }}\" \n       style=\"width: 6cm; height: 4cm; object-fit: fill; display: block; margin: 0 auto;\">\n  \n  <div style=\"width: 6cm; margin-top: 3px;\">\n    <h1 style=\"font-size: 17px; font-weight: bold; margin: 2px 0;\">\n      {{$json.description}}\n    </h1>\n\n    <div style=\"font-size: 32px; font-weight: bold; border: 3px solid black; margin: 4px 0; padding: 2px;\">\n      Cantidad: {{ $json.quantity }}\n    </div>\n\n    <div style=\"font-size: 10px;\">\n      <p style=\"margin: 0;\">Factura: <b>{{ $json.id_facturas}}</b></p>\n      <p style=\"margin: 0;\">\n        {{ new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota', hour12: true }) }}\n      </p>\n    </div>\n  </div>\n</div>",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -336,
+        288
+      ],
+      "id": "b1dd8608-78b5-4f39-90ba-75b4d6c76bef",
+      "name": "HTML"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// 1. Capturamos el binario que viene del Drive\nconst buffer = await this.helpers.getBinaryDataBuffer(0, 'data');\n\n// 2. IMPORTANTE: En lugar de retornar un objeto nuevo, \n// añadimos el base64 al objeto que ya existe ($input.item)\n$input.item.json.base64_final = buffer.toString('base64');\n\n// 3. Devolvemos el ítem completo (con descripción, cantidad Y el nuevo base64)\nreturn $input.item;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -512,
+        288
+      ],
+      "id": "797560ea-0f87-4e76-a774-74ef89169849",
+      "name": "Binario a base64"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "items",
+        "include": "allOtherFields",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -3584,
+        512
+      ],
+      "id": "c1dcf56e-ef3c-4943-bdbf-1db379da4416",
+      "name": "Expandir Productos"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://v2.api2pdf.com/chrome/pdf/html",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"html\": {{ JSON.stringify($json.HTML) }},\n  \"options\": {\n    \"width\": \"2.36in\",\n    \"height\": \"2.8in\",\n    \"marginLeft\": \"0in\",\n    \"marginRight\": \"0in\",\n    \"marginTop\": \"0in\",\n    \"marginBottom\": \"0in\",\n    \"printBackground\": true\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -96,
+        288
+      ],
+      "id": "ae7c16b2-1534-4044-b4cc-8b57d9140a52",
+      "name": "Generar PDF con API",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SdSPt1dZWcJvNScj",
+          "name": "PDF"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "={{ $json.description }}",
+        "filter": {},
+        "options": {}
+      },
+      "id": "986db172-4853-4ba3-865a-6dfb790615fb",
+      "name": "Buscar Archivo en Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -1696,
+        720
+      ],
+      "alwaysOutputData": false,
+      "notesInFlow": false,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "yE0ajPFrG9D1QMnT",
+          "name": "Santiago-Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "872fa487-666c-4d7f-a35c-d60bc5e6f50a",
+              "name": "printerId",
+              "value": "={{ $json.printerId }}",
+              "type": "number"
+            },
+            {
+              "id": "61536712-f42e-46d4-a008-16c2dad9c953",
+              "name": "code",
+              "value": "={{ $json.code }}",
+              "type": "string"
+            },
+            {
+              "id": "6caf0adb-2c74-4d21-908e-392739998bb8",
+              "name": "id_facturas",
+              "value": "={{ $json.id_facturas }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "24861491-6dc5-476a-be32-154cc05be579",
+      "name": "Guardado de datos1"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -3088,
+        528
+      ],
+      "id": "fc8324f8-3b54-48dd-893b-0e18718fb6fa",
+      "name": "DB-Product"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -752,
+        288
+      ],
+      "id": "d42fcdf4-82eb-4751-a751-6c46316d6978",
+      "name": "Drive-Caja"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        576,
+        144
+      ],
+      "id": "b800e24e-36a9-4e26-bbd7-2c6ce60e27cc",
+      "name": "Code-Date"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1056,
+        32
+      ],
+      "id": "5ea34cd0-6524-444d-a59a-036260acd4cd",
+      "name": "DB"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "seller",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -3504,
+        288
+      ],
+      "id": "779ccc61-86a3-4de6-a438-e09256405fd2",
+      "name": "Cajas"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Creamos un Set para almacenar valores únicos\nconst vendedoresUnicos = new Set();\n\n// 2. Iteramos sobre los items que recibe el nodo\nfor (const item of $input.all()) {\n  const seller = item.json.seller;\n  \n  // Si el campo existe, lo añadimos al Set\n  if (seller) {\n    vendedoresUnicos.add(seller);\n  }\n}\n\n// 3. n8n espera un array de objetos, así que convertimos el Set\n// y lo mapeamos al formato correcto [{ json: { seller: '...' } }]\nreturn Array.from(vendedoresUnicos).map(seller => {\n  return {\n    json: {\n      seller: seller\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3296,
+        288
+      ],
+      "id": "0017e3f2-fed3-402a-8f42-31701a8845c6",
+      "name": "Return Cajas"
+    },
+    {
+      "parameters": {
+        "content": "mejoras a futuro\ncrear nueva tabla en la Base de datos para tener la imagen descargada y ahorrar tiempo de ejecucion"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1200,
+        768
+      ],
+      "id": "7204d270-8b08-4301-9a46-b047fd790474",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "Una vez en el VPS debe cambiarse esta funcion, ya que es muy lenta, se puede integrar un programa al VPS para que sea mas rapido la ejecucion de texto a PDF o usando el nodo establecido en N8N",
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -96,
+        464
+      ],
+      "id": "7cf0301e-04a5-4066-8063-38baf5f7d9bf",
+      "name": "Sticky Note1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Obtener Ventas Siigo POS": {
+      "main": [
+        [
+          {
+            "node": "Expandir Facturas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Búsqueda Drive": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convertir a Base64": {
+      "main": [
+        [
+          {
+            "node": "Code-Date",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Identificar Impresora por Caja": {
+      "main": [
+        [
+          {
+            "node": "Configurar Impresora Caja 1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Configurar Impresora Caja 2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Configurar Impresora Caja 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configurar Impresora Caja 1": {
+      "main": [
+        [
+          {
+            "node": "Drive-Caja",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Buscar Archivo en Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configurar Impresora Caja 2": {
+      "main": [
+        [
+          {
+            "node": "Buscar Archivo en Drive",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Drive-Caja",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configurar Impresora Caja 3": {
+      "main": [
+        [
+          {
+            "node": "Buscar Archivo en Drive",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Drive-Caja",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar a PrintNote": {
+      "main": [
+        [
+          {
+            "node": "DB",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Login": {
+      "main": [
+        [
+          {
+            "node": "Obtener Ventas Siigo POS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Identificar Impresora por Caja",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expandir Facturas": {
+      "main": [
+        [
+          {
+            "node": "Expandir Productos",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Cajas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Identificar factura": {
+      "main": [
+        [
+          {
+            "node": "DB-Product",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Descargar Imagen de Drive": {
+      "main": [
+        [
+          {
+            "node": "Drive-Caja",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Descarga de PDF": {
+      "main": [
+        [
+          {
+            "node": "Convertir a Base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar Siigo Cada 10 sg": {
+      "main": [
+        [
+          {
+            "node": "Login",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML": {
+      "main": [
+        [
+          {
+            "node": "Generar PDF con API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Binario a base64": {
+      "main": [
+        [
+          {
+            "node": "HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expandir Productos": {
+      "main": [
+        [
+          {
+            "node": "DB-Product",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Identificar factura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generar PDF con API": {
+      "main": [
+        [
+          {
+            "node": "Descarga de PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Archivo en Drive": {
+      "main": [
+        [
+          {
+            "node": "Descargar Imagen de Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardado de datos1": {
+      "main": [
+        [
+          {
+            "node": "Code-Date",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB-Product": {
+      "main": [
+        [
+          {
+            "node": "Preparar Búsqueda Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive-Caja": {
+      "main": [
+        [
+          {
+            "node": "Binario a base64",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Guardado de datos1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code-Date": {
+      "main": [
+        [
+          {
+            "node": "Enviar a PrintNote",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB": {
+      "main": [
+        [
+          {
+            "node": "Guardado de datos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cajas": {
+      "main": [
+        [
+          {
+            "node": "Return Cajas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "9e9fd933-a6f5-40cf-aac0-655836f76ae9",
+  "meta": {
+    "instanceId": "59e5f6da385c0b7912d27aaac3af85a9e523a8852318e0ac02cc9bc2893bec15"
+  },
+  "id": "GBEEhxw02bXXJ7ha",
+  "tags": []
+}
